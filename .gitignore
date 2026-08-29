@@ -230,3 +230,17 @@ docs/
 # AI assistant instructions
 CLAUDE.md
 .claude/
+
+# Local agent tooling
+.agents/
+skills-lock.json
+continue
+
+# Scraped data / export artifacts (local run outputs)
+jobs.csv
+new
+reports/
+
+# Track project docs (global gitignore has a bare *.md rule)
+!AGENTS.md
+!ATS_DISCOVERY.md

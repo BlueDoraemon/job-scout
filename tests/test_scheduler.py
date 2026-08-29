@@ -10,16 +10,18 @@ from job_scout.config import BotConfig, NotificationsConfig, ScheduleConfig
 
 
 class TestGeneratePlists:
-    def test_returns_three_plists(self):
+    def test_returns_all_plists(self):
         from job_scout.scheduler import generate_plists
 
         schedule = ScheduleConfig()
         plists = generate_plists(schedule, project_dir=Path("/fake/project"))
-        assert len(plists) == 3
+        assert len(plists) == 5
         labels = list(plists.keys())
         assert "com.user.job-scout.scrape" in labels
         assert "com.user.job-scout.digest" in labels
         assert "com.user.job-scout.report" in labels
+        assert "com.user.job-scout.discover" in labels
+        assert "com.user.job-scout.poll" in labels
 
     def test_scrape_uses_start_interval(self):
         from job_scout.scheduler import generate_plists
@@ -70,8 +72,8 @@ class TestGeneratePlists:
         plists = generate_plists(schedule, project_dir=Path("/fake/project"))
 
         stdout_paths = {p["StandardOutPath"] for p in plists.values()}
-        # All 3 should have different log paths
-        assert len(stdout_paths) == 3
+        # All 5 should have different log paths
+        assert len(stdout_paths) == 5
 
 
 class TestGeneratePlistsMultiConfig:
@@ -185,7 +187,7 @@ class TestPlistLabels:
 
 class TestInstall:
     @patch("job_scout.scheduler.subprocess.run")
-    def test_installs_three_plists(self, mock_run, tmp_path):
+    def test_installs_all_plists(self, mock_run, tmp_path):
         from job_scout.scheduler import install, PLIST_LABELS
 
         plist_dir = tmp_path / "LaunchAgents"
@@ -198,12 +200,12 @@ class TestInstall:
         ):
             paths = install(schedule, project_dir=tmp_path)
 
-        assert len(paths) == 3
+        assert len(paths) == 5
         # All plist files should exist
         for label in PLIST_LABELS.values():
             assert (plist_dir / f"{label}.plist").exists()
         # subprocess should have been called for unload + load for each plist (6 calls total)
-        assert mock_run.call_count == 6
+        assert mock_run.call_count == 10
 
     @patch("job_scout.scheduler.subprocess.run")
     def test_install_returns_correct_paths(self, mock_run, tmp_path):
@@ -325,11 +327,21 @@ class TestScheduleCLI:
         """schedule command (no flags) shows status."""
         from typer.testing import CliRunner
         from job_scout.cli import app
+        from job_scout.config import AppConfig
 
         plist_dir = tmp_path / "LaunchAgents"
         plist_dir.mkdir()
 
-        with patch("job_scout.scheduler.PLIST_DIR", plist_dir):
+        cfg = MagicMock(spec=AppConfig)
+        cfg._config_path = tmp_path / "config.yaml"
+        cfg.config_name = None
+        cfg.db_path = None
+        cfg.report_dir = Path.home() / ".local" / "share" / "job-scout" / "reports"
+
+        with (
+            patch("job_scout.cli._get_config", return_value=cfg),
+            patch("job_scout.scheduler.PLIST_DIR", plist_dir),
+        ):
             runner = CliRunner()
             result = runner.invoke(app, ["schedule"])
 
@@ -377,11 +389,21 @@ class TestScheduleCLI:
         """schedule --uninstall calls uninstaller."""
         from typer.testing import CliRunner
         from job_scout.cli import app
+        from job_scout.config import AppConfig
 
         plist_dir = tmp_path / "LaunchAgents"
         plist_dir.mkdir()
 
-        with patch("job_scout.scheduler.PLIST_DIR", plist_dir):
+        cfg = MagicMock(spec=AppConfig)
+        cfg._config_path = tmp_path / "config.yaml"
+        cfg.config_name = None
+        cfg.db_path = None
+        cfg.report_dir = Path.home() / ".local" / "share" / "job-scout" / "reports"
+
+        with (
+            patch("job_scout.cli._get_config", return_value=cfg),
+            patch("job_scout.scheduler.PLIST_DIR", plist_dir),
+        ):
             runner = CliRunner()
             result = runner.invoke(app, ["schedule", "--uninstall"])
 
